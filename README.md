@@ -2,6 +2,6 @@
 A very basic implementation of cryptocurrency (in developement)
 
 ## Dependencies
-The program currently has a few dependencies which will need to be prepared prior to building the source files. The dependencies are listed below.
- - libp2p
+The program currently has a few dependencies which are available int the compressed lib folder. The dependencies are listed below.
+ - asio standalone
  - crypto++
