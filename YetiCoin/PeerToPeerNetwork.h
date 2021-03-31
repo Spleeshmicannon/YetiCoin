@@ -75,7 +75,9 @@ namespace p2p
 		std::string response;
 
 	public:
-		Sender() : pkt("Hello!") {}
+		Sender() : pkt("GET /index.html HTTP/1.1\r\n"
+						"Host:example.com\r\n"
+						"Connection: close\r\n\r\n") {}
 
 		/// <summary>
 		/// Assembles a Packet variable into something
@@ -91,8 +93,7 @@ namespace p2p
 		/// <summary>
 		/// Sends the packet to 'ip' 
 		/// </summary>
-		/// <param name="ip"></param>
-		/// <returns></returns>
+		/// <param name="ip">The IP address</param>
 		void SendPacket(std::string ip)
 		{
 			asio::error_code ec;
@@ -106,7 +107,7 @@ namespace p2p
 			// the network location
 			asio::ip::tcp::endpoint endpoint(asio::ip::make_address(ip, ec), 100);
 
-			// create a soekct, the context will deliver the implementation
+			// create a socket, the context will deliver the implementation
 			asio::ip::tcp::socket socket(context);
 
 			// tell the socket to try and connect
@@ -158,24 +159,33 @@ namespace p2p
 			// preparing acceptor
 			acceptor.listen();
 
-			// create a soekct, the context will deliver the implementation
+			// create a socket, the context will deliver the implementation
 			asio::ip::tcp::socket socket(context);
 
 			// assigning the acceptor the socket
 			acceptor.accept(socket);
-			std::cout << "Connection accepted" << std::endl;
 
-			if (socket.is_open())
+			while (true)
 			{
-				std::string tmp;
-				socket.read_some(asio::buffer(tmp), ec);
-				std::cout << "response: " << tmp << ec.message() << std::endl;
-				tmp = "Thankyou for your message!";
-				socket.write_some(asio::buffer(tmp.data(), tmp.size()), ec);
-			}
-			else
-			{
-				std::cout << "Socket closed" << std::endl;
+					std::cout << "Connection accepted" << std::endl;
+
+				if (socket.is_open())
+				{
+					std::string tmp;
+					socket.wait(socket.wait_read);
+					socket.read_some(asio::buffer(tmp), ec);
+					std::cout << "response: " << tmp.data() << ec.message() << std::endl;
+					tmp = "Thankyou for your message!";
+					socket.write_some(asio::buffer(tmp.data(), tmp.size()), ec);
+				}
+				else
+				{
+					std::cout << "Socket closed" << std::endl;
+				}
+
+				char c;
+				std::cin >> c;
+				if (c != 'r') break;
 			}
 
 			Network::closeGracefully(context, socket, ec);

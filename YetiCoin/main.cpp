@@ -18,7 +18,7 @@ int main()
     else
     {
         p2p::Sender s;
-        s.SendPacket("127.0.0.1");
+        s.SendPacket("93.184.216.34");
     }
     while (!_kbhit());
 
