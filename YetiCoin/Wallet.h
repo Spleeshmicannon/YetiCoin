@@ -1,2 +1,7 @@
 #pragma once
-#include "PeerToPeerNetwork.h"
+#include "Coin.h"
+
+class Wallet
+{
+	
+};
