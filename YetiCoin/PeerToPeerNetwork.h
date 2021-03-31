@@ -30,8 +30,8 @@ namespace p2p
 				Wallet{ 0b01 }, Sender{ 0b00 }, Reciever{ 0b10 };
 		};
 
-		const std::bitset<2> Flags;
-		const std::string Data;
+		std::bitset<2> Flags;
+		std::string Data;
 
 		/// <summary>
 		/// The main constructor for the Packet struct.
@@ -48,21 +48,41 @@ namespace p2p
 		Packet() : Data("DATA UNDEFINED!"), Flags(0b01) {}
 	};
 
-	class Sender
+	class Network
+	{
+	protected:
+		static void setupContext(asio::io_context &ioc)
+		{
+			// keeping the context busy so it doesn't run out of work
+			asio::io_context::work idleWork(ioc);
+
+			// running on seperate thread
+			std::thread contThread = std::thread([&]() { ioc.run(); });
+			contThread.detach(); // Watch this, it could cause problems
+		}
+
+		static void closeGracefully(asio::io_context& ioc, asio::ip::tcp::socket& sock, asio::error_code &ec)
+		{
+			sock.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+			ioc.stop();
+			std::cout << "shutdown: " << ec.message() << std::endl;
+		}
+	};
+	class Sender : Network
 	{
 	private:
 		std::string pkt;
 		std::string response;
 
 	public:
-		Sender() : pkt("") {}
+		Sender() : pkt("Hello!") {}
 
 		/// <summary>
 		/// Assembles a Packet variable into something
 		/// that can be easily sent over the network.
 		/// </summary>
 		/// <param name="pkt">Packet file containing packet data</param>
-		void AssemblePacket(Packet pktInfo)
+		void AssemblePacket(const Packet pktInfo)
 		{
 			// assigning packet data to the packet source
 			pkt = pktInfo.Data;
@@ -80,10 +100,8 @@ namespace p2p
 			// the platform sepcific interface
 			asio::io_context context;
 
-			// keeping the context busy so it doesn't run out of work
-			asio::io_context::work idleWork(context);
-
-			std::thread contThread = std::thread([&]() { context.run(); });
+			// setting up context running with work
+			Network::setupContext(context);
 
 			// the network location
 			asio::ip::tcp::endpoint endpoint(asio::ip::make_address(ip, ec), 100);
@@ -106,25 +124,17 @@ namespace p2p
 			if (socket.is_open())
 			{
 				socket.write_some(asio::buffer(pkt.data(), pkt.size()), ec);
-				socket.async_wait(socket.wait_read, [&](const asio::error_code _ec) 
-					{
-						ec = _ec;
-						if (!ec)
-						{
-							std::cout << "Wait successful" << std::endl;
-							socket.read_some(asio::buffer(response), ec);
-						}
-						else
-						{
-							std::cout << "Wait failed:\n" << std::endl;
-						}
-					}
-				);
+				socket.wait(socket.wait_read);
+				size_t bytesRead = socket.read_some(asio::buffer(response), ec);
+				std::cout << "response: " << response << ec.message() << std::endl;
+				std::cout << "Bytes read: " << bytesRead << std::endl;
 			}
+
+			Network::closeGracefully(context, socket, ec);
 		}
 	};
 
-	class Reciever
+	class Reciever : Network
 	{
 	private:
 		Packet pkt;
@@ -139,33 +149,36 @@ namespace p2p
 			// the platform sepcific interface
 			asio::io_context context;
 
-			// keeping the context busy so it doesn't run out of work
-			asio::io_context::work idleWork(context);
-
-			std::thread contThread = std::thread([&]() { context.run(); });
+			// setting up context running with work
+			Network::setupContext(context);
 
 			// the acceptor for accepting connections
 			asio::ip::tcp::acceptor acceptor(context, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), 100));
+
+			// preparing acceptor
+			acceptor.listen();
 
 			// create a soekct, the context will deliver the implementation
 			asio::ip::tcp::socket socket(context);
 
 			// assigning the acceptor the socket
 			acceptor.accept(socket);
-			asio::streambuf buf;
+			std::cout << "Connection accepted" << std::endl;
 
-			while (asio::read(socket, buf, ec))
+			if (socket.is_open())
 			{
-				std::cout << "recieved: " << &buf << std::endl;
-				asio::write(socket, asio::buffer("Thankyou for sending!"), ec);
-				
-
-				if (ec)
-				{
-					std::cout << "error: " << ec.message() << std::endl;
-					break;
-				}
+				std::string tmp;
+				socket.read_some(asio::buffer(tmp), ec);
+				std::cout << "response: " << tmp << ec.message() << std::endl;
+				tmp = "Thankyou for your message!";
+				socket.write_some(asio::buffer(tmp.data(), tmp.size()), ec);
 			}
+			else
+			{
+				std::cout << "Socket closed" << std::endl;
+			}
+
+			Network::closeGracefully(context, socket, ec);
 		}
 		Packet getPacket() { return pkt; }
 	};

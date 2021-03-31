@@ -1,4 +1,5 @@
 #include <iostream>
+#include <conio.h>
 #include "PeerToPeerNetwork.h"
 
 
@@ -7,14 +8,19 @@
 int main()
 {
     std::cout << "Hello World!\n";
-    p2p::Sender sender;
-    p2p::Reciever reciever;
-
-    std::thread senderThread = std::thread([&]() { sender.SendPacket("127.0.0.1"); });
-    std::thread recieverThread = std::thread([&]() {reciever.asyncWait(); });
-
-    senderThread.join();
-    recieverThread.join();
+    char command;
+    std::cin >> command;
+    if (command == 's')
+    {
+        p2p::Reciever r;
+        r.asyncWait();
+    }
+    else
+    {
+        p2p::Sender s;
+        s.SendPacket("127.0.0.1");
+    }
+    while (!_kbhit());
 
     return 0;
 }
